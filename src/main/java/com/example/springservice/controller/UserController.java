@@ -34,28 +34,133 @@ public class UserController {
     CommissionService commissionService;
     @Autowired
     NotificationService notificationService;
+//======================================= 🛠️ C 🛠️ ======================================================//
 
+//---
 
-    @PutMapping("/profile")
-    public ResponseEntity<?> updateProfile(@RequestBody User updatedUser, HttpServletRequest request) {
-        System.out.println("----> 🟡 PUT /user/profile called");
+//======================================= 🛠️ R 🛠️ ======================================================//
 
-        Integer userId = SessionUtil.getUserIdFromSession(request);
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
+    @GetMapping("/profile")
+    public ResponseEntity<?> getProfile(HttpServletRequest request) {
+        System.out.println("----> 🟢 GET User profile called");
+        User sessionUser = (User) request.getSession().getAttribute("user");
+        if (sessionUser == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
+        }
+        return ResponseEntity.ok(Map.of("user", new UserProfileDTO(sessionUser)));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable Integer id) {
+        System.out.println("----> 🟢 GET /users/" + id + " called");
+
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+        }
+        return ResponseEntity.ok(Map.of("user", new UserProfileDTO(user)));
+    }
+
+    @GetMapping("/posts/{userId}") // for profile
+    public ResponseEntity<?> getPostsByUserId(@PathVariable Integer userId) {
+        System.out.println("----> 🟢 GET User get Post by Id //called//");
+        List<Post> posts = postRepository.findAllByAuthor_UserIdOrderByCreatedAtDesc(userId);
+        List<PostResponseDTO> response = posts.stream()
+                .map(post -> new PostResponseDTO(post, userId))
+                .toList();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> searchUsersByName(@RequestParam String name, HttpServletRequest request) {
+        User currentUser = SessionUtil.requireSessionUser(userRepository, request);
+        System.out.println("----> searchUsersByName called");
+        List <User> users = userRepository.findByNameContainingIgnoreCase(name);
+        List<UserProfileDTO> response = users.stream()
+                .map(user -> new UserProfileDTO(user, currentUser.getUserId(), userFollowsRepository))
+                .toList();
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/following")
+    public ResponseEntity<?> getFollowing(HttpServletRequest request) {
+        User user = SessionUtil.requireSessionUser(userRepository, request);
+
+        List<UserFollows> following = userFollowsRepository.findAllByFollower_UserId(user.getUserId());
+        List<String> usernames = following.stream().map(f -> f.getFollowing().getName()).toList();
+
+        return ResponseEntity.ok(Map.of("following", usernames));
+    }
+
+    @GetMapping("/followers")
+    public ResponseEntity<?> getFollowers(HttpServletRequest request) {
+        User user = SessionUtil.requireSessionUser(userRepository, request);
+
+        List<UserFollows> followers = userFollowsRepository.findAllByFollowing_UserId(user.getUserId());
+        List<String> usernames = followers.stream().map(f -> f.getFollower().getName()).toList();
+
+        return ResponseEntity.ok(Map.of("followers", usernames));
+    }
+
+    @GetMapping("/{id}/followers")
+    public ResponseEntity<?> getFollowersOfUser(@PathVariable Integer id, HttpServletRequest request) {
+        User currentUser = SessionUtil.requireSessionUser(userRepository, request);
+        if (!currentUser.getRole().equals("admin") && !currentUser.getUserId().equals(id)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
         }
 
-        return userRepository.findById(userId)
-                .map(existingUser -> {
-                    applyUserUpdates(existingUser, updatedUser);
-                    userRepository.save(existingUser);
-                    return ResponseEntity.ok(Map.of(
-                            "message", "Profile updated successfully",
-                            "user", new UserProfileDTO(existingUser)
-                    ));
-                })
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found")));
+        List<UserFollows> followers = userFollowsRepository.findAllByFollowing_UserId(id);
+        List<UserProfileDTO> response = followers.stream()
+                .map(f -> new UserProfileDTO(f.getFollower(), currentUser.getUserId(), userFollowsRepository))
+                .toList();
+
+
+        return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/{id}/following")
+    public ResponseEntity<?> getFollowingOfUser(@PathVariable Integer id, HttpServletRequest request) {
+        User currentUser = SessionUtil.requireSessionUser(userRepository, request);
+        if (!currentUser.getRole().equals("admin") && !currentUser.getUserId().equals(id)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        }
+
+        List<UserFollows> following = userFollowsRepository.findAllByFollower_UserId(id);
+        List<UserProfileDTO> response = following.stream()
+                .map(f -> new UserProfileDTO(f.getFollowing(), currentUser.getUserId(), userFollowsRepository))
+                .toList();
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/commissions/request")
+    public ResponseEntity<?> requestCommission(
+            @RequestBody CommissionBriefRequestDTO dto,
+            HttpServletRequest request
+    ) {
+        User customer = SessionUtil.requireSessionUser(userRepository, request);
+        CommissionBriefDTO brief = commissionService.createCommissionRequest(dto, customer);
+
+        // 🛎️ ส่ง noti ให้ศิลปินหลังจากได้ brief กลับมา
+        cardRepo.findById(dto.cardId).ifPresent(card -> notificationService.sendNotiTo(
+                card.getArtist(),
+                "NEW_COMMISSION",
+                "📥 คำขอใหม่จาก " + customer.getName() + " เรื่อง: " + card.getTitle()
+        ));
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Commission request submitted",
+                "brief", brief
+        ));
+    }
+    @GetMapping("/commissions/{id}")
+    public ResponseEntity<?> getMyCommissionDetail(@PathVariable Integer id, HttpServletRequest request) {
+        User user = SessionUtil.requireSessionUser(userRepository, request);
+        return ResponseEntity.ok(commissionService.getDetail(id, user));
+    }
+
+//======================================= 🛠️ U 🛠️ ======================================================//
 
     @PatchMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body, HttpServletRequest request) {
@@ -102,76 +207,41 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Session refreshed", "user", new UserProfileDTO(user)));
     }
 
-    @GetMapping("/profile")
-    public ResponseEntity<?> getProfile(HttpServletRequest request) {
-        System.out.println("----> 🟢 GET User profile called");
-        User sessionUser = (User) request.getSession().getAttribute("user");
-        if (sessionUser == null) {
-            return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
-        }
-        return ResponseEntity.ok(Map.of("user", new UserProfileDTO(sessionUser)));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getUserById(@PathVariable Integer id) {
-        System.out.println("----> 🟢 GET /users/" + id + " called");
-
-        User user = userRepository.findById(id).orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
-        }
-        return ResponseEntity.ok(Map.of("user", new UserProfileDTO(user)));
-    }
-
-    @GetMapping("/posts/{userId}") // for profile
-    public ResponseEntity<?> getPostsByUserId(@PathVariable Integer userId) {
-        System.out.println("----> 🟢 GET User get Post by Id //called//");
-        List<Post> posts = postRepository.findAllByAuthor_UserIdOrderByCreatedAtDesc(userId);
-        List<PostResponseDTO> response = posts.stream()
-                .map(post -> new PostResponseDTO(post, userId))
-                .toList();
-
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<?> searchUsersByName(@RequestParam String name, HttpServletRequest request) {
-        User currentUser = SessionUtil.requireSessionUser(userRepository, request);
-        System.out.println("----> searchUsersByName called");
-        List <User> users = userRepository.findByNameContainingIgnoreCase(name);
-        List<UserProfileDTO> response = users.stream()
-                .map(user -> new UserProfileDTO(user, currentUser.getUserId(), userFollowsRepository))
-                .toList();
-
-        return ResponseEntity.ok(response);
-    }
-
     @PostMapping("/{id}/follow")
     public ResponseEntity<?> followUser(@PathVariable Integer id, HttpServletRequest request) {
         User follower = SessionUtil.requireSessionUser(userRepository, request);
+
         if (follower.getUserId().equals(id)) {
             return ResponseEntity.badRequest().body(Map.of("error", "You cannot follow yourself"));
         }
 
         Optional<User> followingOpt = userRepository.findById(id);
-        if (followingOpt.isEmpty()) return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+        if (followingOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("error", "User not found"));
+        }
 
+        User following = followingOpt.get();
         FollowId followId = new FollowId();
         followId.setFollowerId(follower.getUserId());
-        followId.setFollowingId(id);
+        followId.setFollowingId(following.getUserId());
 
         if (userFollowsRepository.existsById(followId)) {
             return ResponseEntity.ok(Map.of("message", "Already following"));
         }
 
-        User following = followingOpt.get();
-
         UserFollows follow = new UserFollows();
-        follow.setFollower(follower); // auto set followerId in FollowId
-        follow.setFollowing(following); // auto set followingId in FollowId
+        follow.setFollower(follower);
+        follow.setFollowing(following);
         follow.setFollowDate(LocalDateTime.now());
-
         userFollowsRepository.save(follow);
+
+        notificationService.send(
+                following, // --- target
+                follower,  // --- actor
+                Notification.NotificationType.FOLLOW,
+                follower.getName() + " followed you"
+        );
+
         return ResponseEntity.ok(Map.of("message", "Followed successfully"));
     }
 
@@ -191,79 +261,34 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Unfollowed successfully"));
     }
 
-    @GetMapping("/following")
-    public ResponseEntity<?> getFollowing(HttpServletRequest request) {
-        User user = SessionUtil.requireSessionUser(userRepository, request);
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestBody User updatedUser, HttpServletRequest request) {
+        System.out.println("----> 🟡 PUT /user/profile called");
 
-        List<UserFollows> following = userFollowsRepository.findAllByFollower_UserId(user.getUserId());
-        List<String> usernames = following.stream().map(f -> f.getFollowing().getName()).toList();
-
-        return ResponseEntity.ok(Map.of("following", usernames));
-    }
-
-    @GetMapping("/followers")
-    public ResponseEntity<?> getFollowers(HttpServletRequest request) {
-        User user = SessionUtil.requireSessionUser(userRepository, request);
-
-        List<UserFollows> followers = userFollowsRepository.findAllByFollowing_UserId(user.getUserId());
-        List<String> usernames = followers.stream().map(f -> f.getFollower().getName()).toList();
-
-        return ResponseEntity.ok(Map.of("followers", usernames));
-    }
-
-    @GetMapping("/{id}/followers")
-    public ResponseEntity<?> getFollowersOfUser(@PathVariable Integer id, HttpServletRequest request) {
-        User currentUser = SessionUtil.requireSessionUser(userRepository, request);
-        if (!currentUser.getRole().equals("admin") && !currentUser.getUserId().equals(id)) {
-            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
+        Integer userId = SessionUtil.getUserIdFromSession(request);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Unauthorized"));
         }
 
-        List<UserFollows> followers = userFollowsRepository.findAllByFollowing_UserId(id);
-        List<UserProfileDTO> response = followers.stream()
-                .map(f -> new UserProfileDTO(f.getFollower(), currentUser.getUserId(), userFollowsRepository))
-                .toList();
-        return ResponseEntity.ok(response);
+        return userRepository.findById(userId)
+                .map(existingUser -> {
+                    applyUserUpdates(existingUser, updatedUser);
+                    userRepository.save(existingUser);
+                    return ResponseEntity.ok(Map.of(
+                            "message", "Profile updated successfully",
+                            "user", new UserProfileDTO(existingUser)
+                    ));
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "User not found")));
     }
 
-    @GetMapping("/{id}/following")
-    public ResponseEntity<?> getFollowingOfUser(@PathVariable Integer id, HttpServletRequest request) {
-        User currentUser = SessionUtil.requireSessionUser(userRepository, request);
-        if (!currentUser.getRole().equals("admin") && !currentUser.getUserId().equals(id)) {
-            return ResponseEntity.status(403).body(Map.of("error", "Access denied"));
-        }
+//======================================= 🛠️ D 🛠️ ======================================================//
 
-        List<UserFollows> following = userFollowsRepository.findAllByFollower_UserId(id);
-        List<UserProfileDTO> response = following.stream()
-                .map(f -> new UserProfileDTO(f.getFollowing(), currentUser.getUserId(), userFollowsRepository))
-                .toList();
-        return ResponseEntity.ok(response);
-    }
+//---
 
-    @PostMapping("/commissions/request")
-    public ResponseEntity<?> requestCommission(
-            @RequestBody CommissionBriefRequestDTO dto,
-            HttpServletRequest request
-    ) {
-        User customer = SessionUtil.requireSessionUser(userRepository, request);
-        CommissionBriefDTO brief = commissionService.createCommissionRequest(dto, customer);
 
-        // 🛎️ ส่ง noti ให้ศิลปินหลังจากได้ brief กลับมา
-        cardRepo.findById(dto.cardId).ifPresent(card -> notificationService.sendNotiTo(
-                card.getArtist(),
-                "NEW_COMMISSION",
-                "📥 คำขอใหม่จาก " + customer.getName() + " เรื่อง: " + card.getTitle()
-        ));
 
-        return ResponseEntity.ok(Map.of(
-                "message", "Commission request submitted",
-                "brief", brief
-        ));
-    }
-    @GetMapping("/commissions/{id}")
-    public ResponseEntity<?> getMyCommissionDetail(@PathVariable Integer id, HttpServletRequest request) {
-        User user = SessionUtil.requireSessionUser(userRepository, request);
-        return ResponseEntity.ok(commissionService.getDetail(id, user));
-    }
+//======================================= ♻️ Reuse ♻️ ======================================================//
 
     private void applyUserUpdates(User existing, User update) {
         if (isValid(update.getName())) {

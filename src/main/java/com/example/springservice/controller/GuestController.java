@@ -27,7 +27,6 @@ public class GuestController {
     @Autowired
     private PostRepository postRepository;
 
-    // 1. Get All Users
     @GetMapping("/users")
     public ResponseEntity<?> getAllUsers() {
         List<User> users = userRepository.findAllSortedByName();
@@ -35,7 +34,6 @@ public class GuestController {
         return ResponseEntity.ok(response);
     }
 
-    // 2. Search Users by Name
     @GetMapping("/users/search")
     public ResponseEntity<?> searchUsersByName(@RequestParam String name) {
         List<User> users = userRepository.searchByNameSorted(name);
@@ -43,7 +41,6 @@ public class GuestController {
         return ResponseEntity.ok(response);
     }
 
-    // 3. Get All Posts (with style tags)
     @GetMapping("/posts")
     public ResponseEntity<?> getAllPosts() {
         List<Post> posts = postRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -65,7 +62,6 @@ public class GuestController {
         return ResponseEntity.ok(response);
     }
 
-    // 4. Get Post by ID
     @GetMapping("/posts/{id}")
     public ResponseEntity<?> getPostById(@PathVariable Integer id) {
         Optional<Post> postOpt = postRepository.findById(id);

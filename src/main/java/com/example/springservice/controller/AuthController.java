@@ -18,13 +18,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserRepository userRepository;
-
     public AuthController(AuthService authService , UserRepository userRepository) {
         this.authService = authService;
         this.userRepository = userRepository;
-
     }
 
+    //======================================= 🛠️ C 🛠️ ======================================================//
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
         System.out.println("----> 🟢 POST /auth/register called");
@@ -45,6 +44,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "User registered", "userId", user.getUserId()));
     }
 
+    //======================================= 🛠️ R 🛠️ ======================================================//
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
         System.out.println("----> 🟢 POST /auth/login called");
@@ -60,6 +60,33 @@ public class AuthController {
                 .orElse(ResponseEntity.status(401).body(Map.of("message", "Invalid credentials")));
     }
 
+    @GetMapping("/user/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable String id) {
+        System.out.println("----> 🟢 GET /auth/user/" + id + " called");
+
+        Optional<User> userOptional = authService.getUserById(Integer.valueOf(id));
+        return userOptional.map(user -> ResponseEntity.ok(Map.of(
+                "id", user.getUserId(),
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "role", user.getRole()
+        ))).orElseGet(() -> ResponseEntity.status(404).body(Map.of("message", "User not found")));
+    }
+
+    @GetMapping("/user/email/{email}")
+    public ResponseEntity<?> getUserByEmail(@PathVariable String email) {
+        System.out.println("----> 🟢 GET /auth/user/email/" + email + " called");
+
+        Optional<User> userOptional = authService.getUserByEmail(email);
+        return userOptional.map(user -> ResponseEntity.ok(Map.of(
+                "id", user.getUserId(),
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "role", user.getRole()
+        ))).orElseGet(() -> ResponseEntity.status(404).body(Map.of("message", "User not found")));
+    }
+
+    //======================================= 🛠️ U 🛠️ ======================================================//
     @GetMapping("/session")
     public ResponseEntity<?> session(HttpServletRequest request) {
         System.out.println("----> 🟢 GET /auth/session called");
@@ -82,6 +109,7 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
+//======================================= 🛠️ D 🛠️ ======================================================//
     @DeleteMapping("/delete")
     public ResponseEntity<?> deleteAccount(HttpServletRequest request) {
         //✅ SessionUtil vv
@@ -95,33 +123,8 @@ public class AuthController {
 
         return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
     }
-    // ✅ API  ID
-    @GetMapping("/user/{id}")
-    public ResponseEntity<?> getUserById(@PathVariable String id) {
-        System.out.println("----> 🟢 GET /auth/user/" + id + " called");
 
-        Optional<User> userOptional = authService.getUserById(Integer.valueOf(id));
-        return userOptional.map(user -> ResponseEntity.ok(Map.of(
-                "id", user.getUserId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "role", user.getRole()
-        ))).orElseGet(() -> ResponseEntity.status(404).body(Map.of("message", "User not found")));
-    }
 
-    // ✅ API Email
-    @GetMapping("/user/email/{email}")
-    public ResponseEntity<?> getUserByEmail(@PathVariable String email) {
-        System.out.println("----> 🟢 GET /auth/user/email/" + email + " called");
-
-        Optional<User> userOptional = authService.getUserByEmail(email);
-        return userOptional.map(user -> ResponseEntity.ok(Map.of(
-                "id", user.getUserId(),
-                "name", user.getName(),
-                "email", user.getEmail(),
-                "role", user.getRole()
-        ))).orElseGet(() -> ResponseEntity.status(404).body(Map.of("message", "User not found")));
-    }
 
     }
 

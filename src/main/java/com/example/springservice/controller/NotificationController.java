@@ -75,14 +75,3 @@ public class NotificationController {
     }
 }
 
-
-// ✅ ตัวอย่างการใช้งาน
-// @Autowired
-// private NotificationService notificationService;
-//
-// // หลังจาก like post สำเร็จ:
-// notificationService.notifyLike(post.getAuthor(), currentUser, post.getId());
-//
-// // หลังจาก comment สำเร็จ:
-// notificationService.notifyComment(post.getAuthor(), currentUser, post.getId(), comment.getContent());
-

@@ -50,7 +50,7 @@ public class NotificationService {
         send(target, null, type, message);
     }
                       //✅ have Actor
-    private void send(User target, User actor, Notification.NotificationType type, String message) {
+                      public void send(User target, User actor, Notification.NotificationType type, String message) {
         if (target == null || type == null) {
             logWarning();
             return;
