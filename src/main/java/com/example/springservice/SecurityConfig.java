@@ -29,14 +29,14 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth // ✅
-                        .requestMatchers(HttpMethod.OPTIONS, "/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/auth/**").permitAll()
+                .authorizeHttpRequests(auth -> auth // ✅/commissions
+                        .requestMatchers(HttpMethod.OPTIONS, "/auth/**","/user/**","/admin/**","/posts/**","/guest/**" ,"/commissions/**","/artist/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/**","/user/**","/admin/**","/posts/**","/reports/**" , "/notifications/**","/commissions/**","/artist/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/**","/user/**","/admin/**","/posts/**" ,"/guest/**" ,"/notifications/**","/commissions/**","/artist/**").permitAll()
 
-//                        .requestMatchers(HttpMethod.DELETE, "/auth/**").permitAll()
-//                        .requestMatchers(HttpMethod.PUT, "/auth/**").permitAll()
-//                        .requestMatchers(HttpMethod.PATCH, "/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/auth/**","/user/**","/admin/**","/posts/**","/commissions/**","/artist/**").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/auth/**","/user/**","/admin/**","/posts/**","/notifications/**","/commissions/**","/artist/**").permitAll()
+                        .requestMatchers(HttpMethod.PATCH, "/auth/**","/user/**","/admin/**","/posts/**","/commissions/**","/artist/**").permitAll()
 //                        .requestMatchers(HttpMethod.HEAD, "/auth/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()

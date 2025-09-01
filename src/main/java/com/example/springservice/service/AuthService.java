@@ -1,5 +1,7 @@
-package com.example.springservice;
+package com.example.springservice.service;
 
+import com.example.springservice.entites.User;
+import com.example.springservice.repo.UserRepository;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.Optional;
@@ -15,31 +17,36 @@ public class AuthService {
     }
 
     public User register(String name, String email, String password, String role) {
+        String hashedPassword = passwordEncoder.encode(password); // ✅
         User user = new User();
         user.setName(name);
         user.setEmail(email);
-        user.setPassword(password); // อย่าลืม hash password จริงๆ
-        user.setRole(role); // สำคัญ! ต้องมีบรรทัดนี้
+        user.setPassword(hashedPassword);
+        user.setRole(role);
         return userRepository.save(user);
+    }
+
+    public String encodePassword(String rawPassword) {
+        return passwordEncoder.encode(rawPassword);
+    }
+
+    public boolean matchesPassword(String rawPassword, String encodedPassword) {
+        return passwordEncoder.matches(rawPassword, encodedPassword);
     }
 
     public Optional<User> authenticate(String email, String password) {
         return userRepository.findByEmail(email)
                 .filter(user -> passwordEncoder.matches(password, user.getPassword()));
     }
+
     public boolean userExists(String email) {
         return userRepository.findByEmail(email).isPresent();
     }
 
-    // ✅ ค้นหาผู้ใช้โดย ID
-    public Optional<User> getUserById(String id) {
-        // ดึงจากฐานข้อมูลหรือ repository อะไรก็แล้วแต่
-        User user = userRepository.findById(id).orElse(null);
-        return Optional.ofNullable(user);
+    public Optional<User> getUserById(Integer id) {
+        return userRepository.findById(id);
     }
 
-
-    // ✅ ค้นหาผู้ใช้โดย Email
     public Optional<User> getUserByEmail(String email) {
         return userRepository.findByEmail(email);
     }
